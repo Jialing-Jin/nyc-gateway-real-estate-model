@@ -256,33 +256,38 @@ if st.button("Run Model"):
 
     st.header("Analysis")
 
-    analysis_text = f"""
-    <p>
+    st.header("Analysis")
+
+    analysis_html = f"""
+    <div class="analysis-text">
     The model indicates an internal rate of return (IRR) of {investment_result['irr'] * 100:.2f}% 
     and an equity multiple of {investment_result['equity_multiple']:.2f}x. Based on the current 
     market data, the average NYC rent is ${avg_monthly_rent:,.0f} with a vacancy rate of 
     {vacancy_rate * 100:.1f}%. The calculated market score is {market_result['market_score']:.2f}, 
     reflecting moderate market conditions.
-    </p>
-
-    <p>
+    <br><br>
     Given the projected development cost of ${development_result.total_cost:,.0f} and an estimated 
     exit value of ${exit_value:,.0f}, the model suggests that the project may generate 
     ${profit:,.0f} in developer profit under the current assumptions.
-    </p>
-
-    <p>
-    Overall, the model recommends a <b>{decision_result['decision']}</b> strategy. This outcome 
+    <br><br>
+    Overall, the model recommends a <strong>{decision_result['decision']}</strong> strategy. This outcome 
     suggests that while the project shows potential under current assumptions, investors should 
     closely monitor rent growth, construction costs, and cap rate changes, as these variables 
     have a significant impact on project returns.
-    </p>
+    </div>
     """
 
-    st.markdown(
-        f'<div class="analysis-text">{analysis_text}</div>',
-        unsafe_allow_html=True
-    )
+    st.markdown(analysis_html, unsafe_allow_html=True)
+
+    st.markdown("""
+    <style>
+    .analysis-text {
+        font-size: 24px;
+        line-height: 1.7;
+        font-family: Arial, Helvetica, sans-serif;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
     st.header("IRR Sensitivity Analysis")
 
