@@ -1,3 +1,6 @@
+import streamlit as st
+import pandas as pd
+
 from nyc_real_estate_model.utils.rent_loader import get_latest_nyc_rent
 from nyc_real_estate_model.utils.vacancy_loader import get_latest_vacancy
 from nyc_real_estate_model.utils.inventory_loader import get_latest_inventory
@@ -19,23 +22,36 @@ from nyc_real_estate_model.model.investment_metrics import InvestmentMetrics
 from nyc_real_estate_model.model.investment_decision import InvestmentDecision
 
 
-def main():
+st.title("NYC Real Estate Gateway Development Model")
 
-    units = 100
+
+st.header("Project Inputs")
+
+units = st.number_input("Number of Units", 10, 1000, 100)
+construction_years = st.number_input("Construction Years", 1, 5, 2)
+lease_up_years = st.number_input("Lease-Up Years", 1, 3, 1)
+hold_years = st.number_input("Hold Years", 1, 10, 5)
+
+cap_rate = st.slider("Exit Cap Rate", 0.03, 0.08, 0.05)
+
+land_cost = st.number_input("Land Cost ($)", 1000000, 50000000, 15000000)
+construction_cost_per_unit = st.number_input("Construction Cost per Unit ($)", 100000, 800000, 350000)
+
+
+if st.button("Run Model"):
+
     avg_monthly_rent = get_latest_nyc_rent("nyc_real_estate_model/data/medianAskingRent_All.csv")
     vacancy_rate = get_latest_vacancy("nyc_real_estate_model/data/NYHVAC.csv")
-
     inventory = get_latest_inventory("nyc_real_estate_model/data/rentalInventory_All.csv")
-
-    print("NYC Rental Inventory:", inventory)
-
     discount_rate = get_latest_discount("nyc_real_estate_model/data/discountShare_All.csv")
 
-    print("NYC Discount Rate:", discount_rate)
+    st.subheader("Market Data")
 
-    construction_years = 2
-    lease_up_years = 1
-    hold_years = 5
+    st.write("Average NYC Rent:", round(avg_monthly_rent, 2))
+    st.write("Vacancy Rate:", round(vacancy_rate, 4))
+    st.write("Rental Inventory:", inventory)
+    st.write("Discount Rate:", discount_rate)
+
 
     timeline_model = DevelopmentTimeline()
 
@@ -45,9 +61,6 @@ def main():
         hold_years=hold_years
     )
 
-    print("Occupancy Curve:", timeline_result.occupancy_curve)
-
-    other_income_per_unit_month = 50
 
     income_model = IncomeModel()
 
@@ -55,13 +68,9 @@ def main():
         units,
         avg_monthly_rent,
         vacancy_rate,
-        other_income_per_unit_month
+        other_income_per_unit_month=50
     )
 
-    print("Gross Rental Income:", income_result.gross_rental_income)
-    print("Other Income:", income_result.other_income)
-    print("Occupancy Rate:", income_result.occupancy_rate)
-    print("Effective Gross Income:", income_result.effective_gross_income)
 
     expense_model = ExpenseModel()
 
@@ -75,11 +84,9 @@ def main():
         units=units
     )
 
-    print("Total Expenses:", expense_result.total_expenses)
 
     noi = income_result.effective_gross_income - expense_result.total_expenses
 
-    print("NOI:", noi)
 
     cashflow_model = CashFlowModel()
 
@@ -88,52 +95,43 @@ def main():
         occupancy_curve=timeline_result.occupancy_curve
     )
 
-    print("Yearly NOI:", cashflow_result.yearly_noi)
 
     valuation_model = ValuationModel()
 
     valuation_result = valuation_model.calculate(
         noi=noi,
-        cap_rate=0.05
+        cap_rate=cap_rate
     )
 
-    print("Property Value:", valuation_result.property_value)
 
     development_model = DevelopmentCostModel()
 
     development_result = development_model.calculate(
-        land_cost=15000000,
-        construction_cost_per_unit=350000,
+        land_cost=land_cost,
+        construction_cost_per_unit=construction_cost_per_unit,
         soft_cost_rate=0.25,
         units=units
     )
 
-    print("Development Cost:", development_result.total_cost)
 
     profit = valuation_result.property_value - development_result.total_cost
 
-    print("Developer Profit:", profit)
 
-    run_rent_sensitivity()
+    st.header("Financial Results")
+
+    st.metric("NOI", round(noi, 2))
+    st.metric("Property Value", round(valuation_result.property_value, 2))
+    st.metric("Development Cost", round(development_result.total_cost, 2))
+    st.metric("Developer Profit", round(profit, 2))
+
 
     growth = get_rent_growth("nyc_real_estate_model/data/medianAskingRent_All.csv")
 
     future_rent = avg_monthly_rent * (1 + growth)
 
-    print("Rent Growth:", growth)
-    print("Future Rent:", future_rent)
-
     future_noi = future_rent / avg_monthly_rent * noi
 
-    exit_cap_rate = 0.05
-
-    exit_value = future_noi / exit_cap_rate
-
-    exit_score = exit_value / development_result.total_cost
-
-    print("Future NOI:", future_noi)
-    print("Exit Value:", exit_value)
-    print("Exit Score:", exit_score)
+    exit_value = future_noi / cap_rate
 
     investment_model = InvestmentMetrics()
 
@@ -144,35 +142,31 @@ def main():
         discount_rate=0.08
     )
 
-    print("Cash Flows:", investment_result["cash_flows"])
-    print("IRR:", investment_result["irr"])
-    print("NPV:", investment_result["npv"])
-    print("Equity Multiple:", investment_result["equity_multiple"])
 
-    inventory_growth = 0.03
+    st.header("Investment Metrics")
+
+    st.metric("IRR", round(investment_result["irr"] * 100, 2))
+    st.metric("NPV", round(investment_result["npv"], 2))
+    st.metric("Equity Multiple", round(investment_result["equity_multiple"], 2))
+
 
     supply_model = SupplyModel()
 
     supply_result = supply_model.calculate(
         inventory,
-        inventory_growth
+        inventory_growth=0.03
     )
 
-    print("Supply Pressure:", supply_result["supply_pressure"])
-    print("Adjusted Rent Growth:", supply_result["adjusted_rent_growth"])
-
-    inventory_growth = 0.03
 
     market_model = MarketScore()
 
     market_result = market_model.calculate(
         rent_growth=growth,
         vacancy_rate=vacancy_rate,
-        inventory_growth=inventory_growth,
+        inventory_growth=0.03,
         discount_rate=discount_rate
     )
 
-    print("Market Score:", market_result["market_score"])
 
     decision_model = InvestmentDecision()
 
@@ -182,21 +176,25 @@ def main():
         market_score=market_result["market_score"]
     )
 
-    print("Investment Decision:", decision_result["decision"])
+
+    st.header("Investment Decision")
+
+    st.write("Market Score:", market_result["market_score"])
+    st.write("Investment Decision:", decision_result["decision"])
+
 
     sensitivity_model = SensitivityAnalysis()
 
     sensitivity_results = sensitivity_model.run(
         base_rent=avg_monthly_rent,
         base_cost=development_result.total_cost,
-        base_cap_rate=0.05,
+        base_cap_rate=cap_rate,
         noi=noi,
         development_cost=development_result.total_cost
     )
 
-    for r in sensitivity_results:
-        print(r)
+    df = pd.DataFrame(sensitivity_results)
 
+    st.header("Sensitivity Analysis")
 
-if __name__ == "__main__":
-    main()
+    st.dataframe(df)
