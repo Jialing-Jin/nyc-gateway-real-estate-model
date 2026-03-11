@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>NYC Real Estate Feasibility Model</title>
+
+    <style>
+
+    body{
+        font-family: Arial, sans-serif;
+        background:#f4f6fb;
+        height:100vh;
+        display:flex;
+        justify-content:center;
+     align-items:center;
+    }
+
+    .container{
+        background:white;
+        padding:40px;
+        border-radius:12px;
+        box-shadow:0 8px 30px rgba(0,0,0,0.1);
+        width:380px;
+        text-align:center;
+    }
+
+    h1{
+        margin-bottom:25px;
+    }
+
+    input{
+        width:100%;
+        padding:12px;
+        margin:10px 0;
+        border:1px solid #ddd;
+        border-radius:6px;
+        font-size:14px;
+    }
+
+    button{
+        width:100%;
+        padding:12px;
+        background:#2f80ed;
+        color:white;
+        border:none;
+        border-radius:6px;
+        font-size:16px;
+        cursor:pointer;
+    }
+
+    button:hover{
+        background:#1c60b3;
+    }
+
+    .result{
+        margin-top:25px;
+        padding:20px;
+        background:#f0f4ff;
+        border-radius:8px;
+        text-align:left;
+    }
+
+    .result p{
+        margin:8px 0;
+        font-size:16px;
+    }
+
+    .result strong{
+        color:#333;
+    }
+
+    </style>
+
+</head>
+
+
+<body>
+
+<div class="container">
+
+<h1>NYC Development Calculator</h1>
+
+<form method="POST">
+
+<input name="rent" placeholder="Monthly Rent">
+
+<input name="units" placeholder="Number of Units">
+
+<input name="cap_rate" placeholder="Cap Rate (ex: 0.05)">
+
+<input name="construction_cost" placeholder="Development Cost">
+
+<button type="submit">Calculate</button>
+
+</form>
+
+
+{% if result %}
+
+<div class="result">
+
+<p><strong>NOI:</strong> ${{ result.noi }}</p>
+
+<p><strong>Property Value:</strong> ${{ result.value }}</p>
+
+<p><strong>Developer Profit:</strong> ${{ result.profit }}</p>
+
+<p><strong>Exit Score:</strong> {{ result.exit_score }}</p>
+
+</div>
+
+{% endif %}
+
+</div>
+
+</body>
+</html>
