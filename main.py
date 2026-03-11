@@ -253,9 +253,6 @@ if st.button("Run Model"):
         decision_result["decision"]
     )
 
-
-    st.header("Analysis")
-
     st.header("Analysis")
 
     analysis_html = f"""
