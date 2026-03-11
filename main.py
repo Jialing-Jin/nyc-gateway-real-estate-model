@@ -256,26 +256,105 @@ if st.button("Run Model"):
 
     st.header("Analysis")
 
-
     analysis_text = f"""
-    The model indicates an internal rate of return (IRR) of {investment_result['irr']*100:.2f}% 
+    <p>
+    The model indicates an internal rate of return (IRR) of {investment_result['irr'] * 100:.2f}% 
     and an equity multiple of {investment_result['equity_multiple']:.2f}x. Based on the current 
     market data, the average NYC rent is ${avg_monthly_rent:,.0f} with a vacancy rate of 
-    {vacancy_rate*100:.1f}%. The calculated market score is {market_result['market_score']:.2f}, 
+    {vacancy_rate * 100:.1f}%. The calculated market score is {market_result['market_score']:.2f}, 
     reflecting moderate market conditions.
+    </p>
 
+    <p>
     Given the projected development cost of ${development_result.total_cost:,.0f} and an estimated 
     exit value of ${exit_value:,.0f}, the model suggests that the project may generate 
     ${profit:,.0f} in developer profit under the current assumptions.
+    </p>
 
+    <p>
     Overall, the model recommends a <b>{decision_result['decision']}</b> strategy. This outcome 
     suggests that while the project shows potential under current assumptions, investors should 
     closely monitor rent growth, construction costs, and cap rate changes, as these variables 
     have a significant impact on project returns.
+    </p>
     """
-
 
     st.markdown(
         f'<div class="analysis-text">{analysis_text}</div>',
         unsafe_allow_html=True
     )
+
+    st.header("IRR Sensitivity Analysis")
+
+    rent_changes = [-0.10, 0, 0.10]
+    cap_changes = [-0.01, 0, 0.01]
+
+    irr_matrix = []
+
+    for r in rent_changes:
+
+        row = []
+
+        for c in cap_changes:
+            adj_rent = avg_monthly_rent * (1 + r)
+
+            adj_cap = cap_rate + c
+
+            adj_noi = adj_rent / avg_monthly_rent * noi
+
+            adj_exit_value = adj_noi / adj_cap
+
+            adj_investment = investment_model.calculate(
+                development_cost=development_result.total_cost,
+                yearly_noi=cashflow_result.yearly_noi,
+                exit_value=adj_exit_value,
+                discount_rate=0.08
+            )
+
+            irr_value = adj_investment["irr"] * 100
+
+            row.append(round(irr_value, 2))
+
+        irr_matrix.append(row)
+
+    df_sensitivity = pd.DataFrame(
+
+        irr_matrix,
+
+        index=["Rent -10%", "Base Rent", "Rent +10%"],
+
+        columns=["Cap -1%", "Base Cap", "Cap +1%"]
+
+    )
+
+    fig = px.imshow(
+
+        df_sensitivity,
+
+        text_auto=".2f",
+
+        aspect="auto",
+
+        color_continuous_scale="RdYlGn",
+
+        labels=dict(
+
+            x="Exit Cap Rate Scenario",
+
+            y="Rent Scenario",
+
+            color="IRR (%)"
+
+        )
+
+    )
+
+    fig.update_layout(
+
+        title="IRR Sensitivity Heatmap",
+
+        title_font_size=20
+
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
