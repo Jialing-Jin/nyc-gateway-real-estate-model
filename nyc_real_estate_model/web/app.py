@@ -33,7 +33,6 @@ st.set_page_config(
 
 # ── Global CSS ────────────────────────────────────────────────────────────────
 st.markdown("""
-
 <style>
 
 /* Force main app into readable light mode */
@@ -153,7 +152,7 @@ h3 {
 /* Metric numbers */
 /* Metric values */
 [data-testid="stMetricValue"] {
-    font-size: 1.85rem !important;
+    font-size: 1.55rem !important;
     font-weight: 650 !important;
     color: #1f2933 !important;
     line-height: 1.15;
@@ -168,10 +167,9 @@ h3 {
 }
 
 /* Tabs */
-/* Tabs */
 button[data-baseweb="tab"] {
-    font-size: 1rem !important;
-    font-weight: 550 !important;
+    font-size: 1.08rem !important;
+    font-weight: 600 !important;
     color: #5b6b7a !important;
     padding-left: 0.2rem !important;
     padding-right: 1.2rem !important;
@@ -185,6 +183,22 @@ button[data-baseweb="tab"][aria-selected="true"] {
 div[data-baseweb="tab-highlight"] {
     background-color: #2f5d8c !important;
     height: 2.5px !important;
+}
+
+/* Dataframe table */
+[data-testid="stDataFrame"] table {
+    font-size: 1rem !important;
+}
+
+[data-testid="stDataFrame"] th {
+    font-size: 1rem !important;
+    font-weight: 650 !important;
+    color: var(--c-primary) !important;
+}
+
+[data-testid="stDataFrame"] td {
+    font-size: 1rem !important;
+    color: #1f2933 !important;
 }
 
 /* Sidebar */
@@ -549,7 +563,7 @@ with tab_sensitivity:
 # ═════════════════════════════════════════════════════════════════════════════
 with tab_cashflow:
 
-    st.subheader("Projected Annual Cash Flows")
+    st.subheader("Projected Annual NOI")
 
     years = list(range(1, len(cashflow.yearly_noi) + 1))
     df_cf = pd.DataFrame({
@@ -566,36 +580,66 @@ with tab_cashflow:
     ))
     fig_cf.update_layout(
         xaxis_title="Year",
-        yaxis_title="NOI ($)",
-        height=360,
-        margin=dict(t=20, b=40, l=10, r=10),
+        yaxis_title="Annual NOI ($)",
+        height=390,
+        margin=dict(t=15, b=45, l=20, r=20),
         plot_bgcolor="white",
-        yaxis=dict(gridcolor="#eee"),
+        paper_bgcolor="white",
+        font=dict(size=14, color="#1f2933"),
+        xaxis=dict(
+            tickmode="linear",
+            dtick=1,
+            gridcolor="#f0f2f5",
+            zeroline=False
+        ),
+        yaxis=dict(
+            gridcolor="#e8edf3",
+            zeroline=True,
+            zerolinecolor="#d0d7de"
+        ),
     )
     st.plotly_chart(fig_cf, use_container_width=True)
 
+    st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+
+    st.subheader("Cumulative NOI Over Hold Period")
+
     df_cf["Cumulative NOI ($)"] = df_cf["Annual NOI ($)"].cumsum()
+
     fig_cum = go.Figure()
     fig_cum.add_trace(go.Scatter(
         x=df_cf["Year"],
         y=df_cf["Cumulative NOI ($)"],
         mode="lines+markers",
-        line=dict(color="#1f4e79", width=2),
-        marker=dict(size=7),
+        line=dict(color="#1f4e79", width=3),
+        marker=dict(size=8, color="#1f4e79"),
         hovertemplate="Year %{x}: $%{y:,.0f}<extra></extra>",
     ))
     fig_cum.update_layout(
-        title="Cumulative NOI over Hold Period",
         xaxis_title="Year",
         yaxis_title="Cumulative NOI ($)",
-        height=300,
-        margin=dict(t=40, b=40, l=10, r=10),
+        height=390,
+        margin=dict(t=15, b=45, l=20, r=20),
         plot_bgcolor="white",
-        yaxis=dict(gridcolor="#eee"),
+        paper_bgcolor="white",
+        font=dict(size=14, color="#1f2933"),
+        xaxis=dict(
+            tickmode="linear",
+            dtick=1,
+            gridcolor="#f0f2f5",
+            zeroline=False
+        ),
+        yaxis=dict(
+            gridcolor="#e8edf3",
+            zeroline=True,
+            zerolinecolor="#d0d7de"
+        ),
     )
     st.plotly_chart(fig_cum, use_container_width=True)
 
     st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+
+    st.subheader("Cash Flow Table")
     st.dataframe(
         df_cf.style.format({
             "Annual NOI ($)": "${:,.0f}",
