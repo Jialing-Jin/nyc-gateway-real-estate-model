@@ -34,13 +34,44 @@ st.set_page_config(
 # ── Global CSS ────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-[data-testid="stMetricValue"] { font-size: 1.6rem !important; }
-button[data-baseweb="tab"] { font-size: 0.95rem; font-weight: 500; }
+/* ===== Option C — Deep Blue & Steel palette ===== */
+:root {
+    --c-primary: #0c2340;   /* deep navy */
+    --c-accent:  #1f4e79;   /* steel blue */
+    --c-muted:   #6b8cae;   /* light steel */
+    --c-surface: #f5f7fa;   /* near-white surface */
+    --c-line:    #e2e8f0;   /* hairline */
+}
+
+/* Headings & titles */
+h1, h2, h3 { color: var(--c-primary) !important; }
+
+/* Metric numbers */
+[data-testid="stMetricValue"] { font-size: 1.6rem !important; color: var(--c-primary) !important; }
+[data-testid="stMetricLabel"] { color: var(--c-muted) !important; }
+
+/* Tabs */
+button[data-baseweb="tab"] { font-size: 0.95rem; font-weight: 500; color: var(--c-muted); }
+button[data-baseweb="tab"][aria-selected="true"] { color: var(--c-primary); }
+div[data-baseweb="tab-highlight"] { background-color: var(--c-accent) !important; }
+
+/* Sidebar */
+section[data-testid="stSidebar"] { background-color: var(--c-surface); }
 section[data-testid="stSidebar"] .stNumberInput { margin-bottom: 0.2rem; }
+
+/* Run button (primary) */
+button[kind="primary"] {
+    background-color: var(--c-primary) !important;
+    border-color: var(--c-primary) !important;
+}
+button[kind="primary"]:hover {
+    background-color: var(--c-accent) !important;
+    border-color: var(--c-accent) !important;
+}
 
 .section-divider {
     border: none;
-    border-top: 1px solid #e0e0e0;
+    border-top: 1px solid var(--c-line);
     margin: 1.2rem 0;
 }
 
@@ -55,10 +86,10 @@ section[data-testid="stSidebar"] .stNumberInput { margin-bottom: 0.2rem; }
 .analysis-section h3 {
     font-size: 17px;
     font-weight: 600;
-    color: #1e3a8a;
+    color: #0c2340;
     margin-top: 1.5rem;
     margin-bottom: 0.6rem;
-    border-bottom: 2px solid #e8f0eb;
+    border-bottom: 2px solid #e2e8f0;
     padding-bottom: 0.3rem;
     font-family: inherit;
 }
@@ -68,27 +99,31 @@ section[data-testid="stSidebar"] .stNumberInput { margin-bottom: 0.2rem; }
 }
 .analysis-section .highlight {
     font-weight: 600;
-    color: #1e3a8a;
+    color: #1f4e79;
 }
 .analysis-section .note {
     font-size: 13px;
-    color: #7f8c8d;
+    color: #6b8cae;
     font-style: italic;
-    background: #f8f9fa;
+    background: #f5f7fa;
     padding: 0.6rem 0.9rem;
-    border-left: 3px solid #bdc3c7;
+    border-left: 3px solid #1f4e79;
     margin-top: 1rem;
     border-radius: 0 4px 4px 0;
 }
 
-.badge-hold { display: inline-block; background: #fff3cd; color: #856404; font-weight: 600; font-size: 1rem; padding: 0.3rem 1rem; border-radius: 20px; border: 1px solid #ffc107; }
-.badge-buy  { display: inline-block; background: #d1e7dd; color: #0a5c36; font-weight: 600; font-size: 1rem; padding: 0.3rem 1rem; border-radius: 20px; border: 1px solid #198754; }
-.badge-pass { display: inline-block; background: #f8d7da; color: #842029; font-weight: 600; font-size: 1rem; padding: 0.3rem 1rem; border-radius: 20px; border: 1px solid #dc3545; }
+/* Decision badges — deep blue family */
+.badge-buy  { display: inline-block; background: #e8eef4; color: #0c2340; font-weight: 600; font-size: 1rem; padding: 0.3rem 1rem; border-radius: 20px; border: 1px solid #1f4e79; }
+.badge-hold { display: inline-block; background: #fdf4e3; color: #7a5012; font-weight: 600; font-size: 1rem; padding: 0.3rem 1rem; border-radius: 20px; border: 1px solid #d4a24e; }
+.badge-pass { display: inline-block; background: #f7e8e8; color: #7a1f1f; font-weight: 600; font-size: 1rem; padding: 0.3rem 1rem; border-radius: 20px; border: 1px solid #b34a4a; }
 </style>
 """, unsafe_allow_html=True)
 
 # ── Sidebar inputs ────────────────────────────────────────────────────────────
+# Sidebar inputs
 st.sidebar.header("Project Inputs")
+
+run = st.sidebar.button("▶  Run Analysis", use_container_width=True, type="primary")
 
 units = st.sidebar.number_input(
     "Number of Units", min_value=1, value=100, step=1
@@ -99,38 +134,39 @@ rent = st.sidebar.number_input(
 construction_cost = st.sidebar.number_input(
     "Construction Cost per Unit ($, excl. land)",
     min_value=100000, value=500000, step=50000,
-    help="NYC/NJ rental construction typically $400K–$1M+ per unit (excluding land)."
+    help="NYC/NJ rental construction typically $400K-$1M+ per unit (excluding land)."
 )
 land_cost = st.sidebar.number_input(
     "Land Cost ($)",
     min_value=500000, value=15000000, step=500000,
     help="Land cost is highly location-dependent and calculated separately."
 )
-soft_cost_rate = st.sidebar.number_input(
-    "Soft Cost Rate",
-    min_value=0.0, max_value=0.5,
-    value=0.25, step=0.01, format="%.2f"
-)
 cap_rate = st.sidebar.number_input(
     "Exit Cap Rate",
     min_value=0.01, max_value=0.15,
     value=0.05, step=0.0025, format="%.4f",
-    help="Step size is 25 basis points (0.25%) — cap rate moves significantly affect exit value."
-)
-construction_years = st.sidebar.number_input(
-    "Construction Years", min_value=1, max_value=10, value=2, step=1
-)
-lease_up_years = st.sidebar.number_input(
-    "Lease-Up Years",
-    min_value=0.5, max_value=3.0,
-    value=1.0, step=0.5, format="%.1f",
-    help="Typical lease-up period is 1 to 2.5 years."
-)
-hold_years = st.sidebar.number_input(
-    "Hold Years", min_value=1, max_value=20, value=5, step=1
+    help="Step size is 25 basis points (0.25%)."
 )
 
-run = st.sidebar.button("▶  Run Analysis", use_container_width=True, type="primary")
+# Advanced settings (collapsed to keep the sidebar short)
+with st.sidebar.expander("Advanced settings"):
+    soft_cost_rate = st.number_input(
+        "Soft Cost Rate",
+        min_value=0.0, max_value=0.5,
+        value=0.25, step=0.01, format="%.2f"
+    )
+    construction_years = st.number_input(
+        "Construction Years", min_value=1, max_value=10, value=2, step=1
+    )
+    lease_up_years = st.number_input(
+        "Lease-Up Years",
+        min_value=0.5, max_value=3.0,
+        value=1.0, step=0.5, format="%.1f",
+        help="Typical lease-up period is 1 to 2.5 years."
+    )
+    hold_years = st.number_input(
+        "Hold Years", min_value=1, max_value=20, value=5, step=1
+    )
 
 # ── Main header ───────────────────────────────────────────────────────────────
 st.title("NYC Real Estate Development Feasibility Tool")
@@ -226,7 +262,7 @@ with tab_overview:
             labels=["Land", "Hard Cost", "Soft Cost"],
             values=[land_cost, hard_cost, soft_cost],
             hole=0.45,
-            marker_colors=["#1a7f5a", "#2ecc71", "#a8e6cf"],
+            marker_colors=["#0c2340", "#1f4e79", "#6b8cae"],
             textinfo="label+percent",
             hovertemplate="%{label}: $%{value:,.0f}<extra></extra>",
         ))
@@ -237,7 +273,7 @@ with tab_overview:
             annotations=[dict(
                 text=f"${development.total_cost/1e6:.1f}M",
                 x=0.5, y=0.5, font_size=16, showarrow=False,
-                font_color="#333"
+                font_color="#0c2340"
             )]
         )
         st.plotly_chart(fig_cost, use_container_width=True)
@@ -403,7 +439,7 @@ with tab_cashflow:
     fig_cf.add_trace(go.Bar(
         x=df_cf["Year"],
         y=df_cf["Annual NOI ($)"],
-        marker_color=["#a8e6cf" if v >= 0 else "#f5a5a5" for v in df_cf["Annual NOI ($)"]],
+        marker_color=["#1f4e79" if v >= 0 else "#b34a4a" for v in df_cf["Annual NOI ($)"]],
         hovertemplate="Year %{x}: $%{y:,.0f}<extra></extra>",
     ))
     fig_cf.update_layout(
@@ -422,7 +458,7 @@ with tab_cashflow:
         x=df_cf["Year"],
         y=df_cf["Cumulative NOI ($)"],
         mode="lines+markers",
-        line=dict(color="#1a7f5a", width=2),
+        line=dict(color="#1f4e79", width=2),
         marker=dict(size=7),
         hovertemplate="Year %{x}: $%{y:,.0f}<extra></extra>",
     ))
