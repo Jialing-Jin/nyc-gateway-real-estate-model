@@ -33,7 +33,90 @@ st.set_page_config(
 
 # ── Global CSS ────────────────────────────────────────────────────────────────
 st.markdown("""
+
 <style>
+
+/* Force main app into readable light mode */
+.stApp {
+    background-color: #ffffff !important;
+}
+
+/* Main content background */
+[data-testid="stAppViewContainer"],
+[data-testid="block-container"] {
+    background-color: #ffffff !important;
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background-color: #f5f7fa !important;
+}
+
+/* Normal text only, do not target all div/span globally */
+h1, h2, h3, h4, h5, h6,
+p, label,
+[data-testid="stMarkdownContainer"] {
+    color: #1f2933 !important;
+}
+
+/* Primary button */
+div.stButton > button[kind="primary"] {
+    background-color: #edf3f9 !important;
+    color: #163a5c !important;
+    border: 3px solid #2f5d8c !important;
+    font-weight: 700 !important;
+    border-radius: 12px !important;
+    transition: all 0.2s ease !important;
+    box-shadow: none !important;
+}
+
+/* Hover */
+div.stButton > button[kind="primary"]:hover {
+    background-color: #2f5d8c !important;
+    color: #ffffff !important;
+    border: 3px solid #1f4e79 !important;
+}
+
+/* Number input text */
+input {
+    background-color: #ffffff !important;
+    color: #1f2933 !important;
+}
+
+/* Number input +/- buttons */
+button[data-testid="stNumberInputStepUp"],
+button[data-testid="stNumberInputStepDown"] {
+    background-color: #0c2340 !important;
+    color: #ffffff !important;
+    border: none !important;
+}
+
+/* Hover */
+button[data-testid="stNumberInputStepUp"]:hover,
+button[data-testid="stNumberInputStepDown"]:hover {
+    background-color: #163a5c !important;
+}
+
+/* Remove Streamlit top header spacing */
+header[data-testid="stHeader"] {
+    background: transparent;
+    height: 0rem;
+}
+
+/* Move toolbar slightly right */
+[data-testid="stToolbar"] {
+    right: 1rem;
+}
+
+/* Reduce top page padding */
+/* Reduce top spacing and widen layout */
+.block-container {
+    padding-top: 0.5rem !important;
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
+    max-width: 100% !important;
+}
+
 /* ===== Option C — Deep Blue & Steel palette ===== */
 :root {
     --c-primary: #0c2340;   /* deep navy */
@@ -44,30 +127,69 @@ st.markdown("""
 }
 
 /* Headings & titles */
-h1, h2, h3 { color: var(--c-primary) !important; }
+/* Typography hierarchy */
+h1 {
+    color: var(--c-primary) !important;
+    font-size: 2.8rem !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.5px;
+    line-height: 1.15;
+}
+
+h2 {
+    color: var(--c-primary) !important;
+    font-size: 1.9rem !important;
+    font-weight: 650 !important;
+    line-height: 1.25;
+}
+
+h3 {
+    color: var(--c-primary) !important;
+    font-size: 1.35rem !important;
+    font-weight: 600 !important;
+    line-height: 1.3;
+}
 
 /* Metric numbers */
-[data-testid="stMetricValue"] { font-size: 1.6rem !important; color: var(--c-primary) !important; }
-[data-testid="stMetricLabel"] { color: var(--c-muted) !important; }
+/* Metric values */
+[data-testid="stMetricValue"] {
+    font-size: 1.85rem !important;
+    font-weight: 650 !important;
+    color: #1f2933 !important;
+    line-height: 1.15;
+}
+
+/* Metric labels */
+[data-testid="stMetricLabel"] {
+    color: #5b6b7a !important;
+    font-size: 0.95rem !important;
+    font-weight: 500 !important;
+    text-transform: none !important;
+}
 
 /* Tabs */
-button[data-baseweb="tab"] { font-size: 0.95rem; font-weight: 500; color: var(--c-muted); }
-button[data-baseweb="tab"][aria-selected="true"] { color: var(--c-primary); }
-div[data-baseweb="tab-highlight"] { background-color: var(--c-accent) !important; }
+/* Tabs */
+button[data-baseweb="tab"] {
+    font-size: 1rem !important;
+    font-weight: 550 !important;
+    color: #5b6b7a !important;
+    padding-left: 0.2rem !important;
+    padding-right: 1.2rem !important;
+}
+
+button[data-baseweb="tab"][aria-selected="true"] {
+    color: var(--c-primary) !important;
+    font-weight: 650 !important;
+}
+
+div[data-baseweb="tab-highlight"] {
+    background-color: #2f5d8c !important;
+    height: 2.5px !important;
+}
 
 /* Sidebar */
 section[data-testid="stSidebar"] { background-color: var(--c-surface); }
 section[data-testid="stSidebar"] .stNumberInput { margin-bottom: 0.2rem; }
-
-/* Run button (primary) */
-button[kind="primary"] {
-    background-color: var(--c-primary) !important;
-    border-color: var(--c-primary) !important;
-}
-button[kind="primary"]:hover {
-    background-color: var(--c-accent) !important;
-    border-color: var(--c-accent) !important;
-}
 
 .section-divider {
     border: none;
@@ -252,7 +374,7 @@ with tab_overview:
 
     st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
 
-    left, right = st.columns(2)
+    left, right = st.columns([1.1, 1])
 
     with left:
         st.subheader("Development Cost")
@@ -269,10 +391,10 @@ with tab_overview:
         fig_cost.update_layout(
             showlegend=False,
             margin=dict(t=10, b=10, l=10, r=10),
-            height=260,
+            height=330,
             annotations=[dict(
                 text=f"${development.total_cost/1e6:.1f}M",
-                x=0.5, y=0.5, font_size=16, showarrow=False,
+                x=0.5, y=0.5, font_size=18, showarrow=False,
                 font_color="#0c2340"
             )]
         )
