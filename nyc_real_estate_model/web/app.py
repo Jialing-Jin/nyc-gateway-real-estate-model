@@ -259,6 +259,13 @@ section[data-testid="stSidebar"] .stNumberInput { margin-bottom: 0.2rem; }
 # Sidebar inputs
 st.sidebar.header("Project Inputs")
 
+analysis_mode = st.sidebar.radio(
+    "Analysis Mode",
+    ["NYC only", "NYC vs NJ"],
+    horizontal=True,
+    help="Compare NYC project against a hypothetical NJ substitute market."
+)
+
 run = st.sidebar.button("▶  Run Analysis", use_container_width=True, type="primary")
 
 units = st.sidebar.number_input(
@@ -302,6 +309,32 @@ with st.sidebar.expander("Advanced settings"):
     )
     hold_years = st.number_input(
         "Hold Years", min_value=1, max_value=20, value=5, step=1
+    )
+
+# NJ substitute market inputs (only shown when NYC vs NJ is selected)
+if analysis_mode == "NYC vs NJ":
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("NJ Market Assumptions")
+    nj_rent = st.sidebar.number_input(
+        "NJ Monthly Rent ($)", min_value=500, value=2416, step=50,
+        help="NJ statewide avg ~$2,416 (RentCafe 2026). Adjust for specific area."
+    )
+    nj_construction_cost = st.sidebar.number_input(
+        "NJ Construction Cost/Unit ($)", min_value=50000, value=350000, step=50000,
+        help="NJ construction typically 20-30% below NYC."
+    )
+    nj_land_cost = st.sidebar.number_input(
+        "NJ Land Cost ($)", min_value=500000, value=8000000, step=500000
+    )
+    nj_vacancy_rate = st.sidebar.number_input(
+        "NJ Vacancy Rate", min_value=0.005, max_value=0.15,
+        value=0.04, step=0.005, format="%.3f",
+        help="NJ statewide avg ~3-5%."
+    )
+    nj_rent_growth = st.sidebar.number_input(
+        "NJ Annual Rent Growth", min_value=-0.05, max_value=0.15,
+        value=0.008, step=0.005, format="%.3f",
+        help="NJ statewide avg ~0.8% YoY (2026)."
     )
 
 # ── Main header ───────────────────────────────────────────────────────────────
@@ -366,6 +399,52 @@ decision = decision_model.decide(
     investment["equity_multiple"],
     market["market_score"]
 )
+
+# NJ model (only computed when NYC vs NJ mode is selected)
+nj_results = None
+sub_pressure = None
+
+if analysis_mode == "NYC vs NJ":
+    nj_income = income_model.calculate(units, nj_rent, nj_vacancy_rate, 50)
+    nj_expenses = expense_model.calculate(
+        nj_income.effective_gross_income,
+        0.012, 800, 1200, 900, 0.05, units
+    )
+    nj_noi = nj_income.effective_gross_income - nj_expenses.total_expenses
+    nj_valuation = valuation_model.calculate(nj_noi, cap_rate)
+    nj_development = development_model.calculate(nj_land_cost, nj_construction_cost, soft_cost_rate, units)
+    nj_cashflow = cashflow_model.build_cashflow(nj_noi, timeline.occupancy_curve)
+    nj_investment = investment_model.calculate(
+        nj_development.total_cost,
+        nj_cashflow.yearly_noi,
+        nj_valuation.property_value,
+        0.08
+    )
+    nj_results = {
+        "noi": nj_noi,
+        "value": nj_valuation.property_value,
+        "irr": nj_investment["irr"],
+        "em": nj_investment["equity_multiple"],
+        "cost": nj_development.total_cost,
+    }
+
+    # Substitution pressure scoring (3 factors, 0-2 each, total 0-6)
+    price_gap = rent / max(nj_rent, 1)
+    gap_score = 2 if price_gap > 1.7 else (1 if price_gap > 1.4 else 0)
+
+    growth_diff = nj_rent_growth - rent_growth
+    growth_score = 2 if growth_diff > 0.02 else (1 if growth_diff > 0 else 0)
+
+    vac_diff = nj_vacancy_rate - vacancy_rate
+    vac_score = 0 if vac_diff > 0.02 else (1 if vac_diff > 0 else 2)
+
+    total_score = gap_score + growth_score + vac_score
+    if total_score <= 1:
+        sub_pressure = "Low"
+    elif total_score <= 3:
+        sub_pressure = "Moderate"
+    else:
+        sub_pressure = "High"
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 tab_overview, tab_sensitivity, tab_cashflow, tab_analysis = st.tabs([
@@ -442,6 +521,42 @@ with tab_overview:
             f'<span class="{badge_cls}">{decision["decision"]}</span></p>',
             unsafe_allow_html=True,
         )
+        # NJ comparison panel (only shown in NYC vs NJ mode)
+        if analysis_mode == "NYC vs NJ" and nj_results:
+            st.markdown('<hr class="section-divider">', unsafe_allow_html=True)
+            st.subheader("NYC vs NJ Side-by-Side Comparison")
+
+            col_nyc, col_nj = st.columns(2)
+            with col_nyc:
+                st.markdown("**New York City**")
+                st.metric("NOI", f"${noi:,.0f}")
+                st.metric("Property Value", f"${valuation.property_value:,.0f}")
+                st.metric("Total Dev Cost", f"${development.total_cost:,.0f}")
+                st.metric("IRR", f"{investment['irr']:.2%}")
+                st.metric("Equity Multiple", f"{investment['equity_multiple']:.2f}x")
+            with col_nj:
+                st.markdown("**New Jersey**")
+                st.metric("NOI", f"${nj_results['noi']:,.0f}")
+                st.metric("Property Value", f"${nj_results['value']:,.0f}")
+                st.metric("Total Dev Cost", f"${nj_results['cost']:,.0f}")
+                st.metric("IRR", f"{nj_results['irr']:.2%}")
+                st.metric("Equity Multiple", f"{nj_results['em']:.2f}x")
+
+            # Substitution pressure indicator
+            pressure_color = {"Low": "#1f4e79", "Moderate": "#d4a24e", "High": "#b34a4a"}
+            st.markdown(f"""
+            <div style="margin-top:1rem;padding:0.8rem 1.2rem;background:#f5f7fa;
+                        border-left:4px solid {pressure_color[sub_pressure]};border-radius:0 6px 6px 0;">
+                <strong style="color:#0c2340;">NJ Substitution Pressure: </strong>
+                <span style="color:{pressure_color[sub_pressure]};font-weight:600;font-size:1.1rem;">
+                    {sub_pressure}
+                </span>
+                <br><span style="font-size:0.85rem;color:#5b6b7a;">
+                    NYC rent is {rent / max(nj_rent, 1):.1f}x NJ rent.
+                    {"NJ rent growth exceeds NYC, increasing substitution risk." if nj_rent_growth > rent_growth else "NYC rent growth leads NJ, limiting substitution risk."}
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # TAB 2 — SENSITIVITY (cap rate ±50bp / ±100bp per tutor)
@@ -664,74 +779,141 @@ with tab_analysis:
     gross_profit = valuation.property_value - development.total_cost
 
     analysis_html = f"""
-    <div class="analysis-section">
+        <style>
+        .a-cards {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 10px;
+            margin-bottom: 14px;
+        }}
+        .a-card {{
+            background: #f5f7fa;
+            border-radius: 8px;
+            padding: 10px 14px;
+        }}
+        .a-card .lbl {{
+            font-size: 12px;
+            color: #6b8cae;
+            margin-bottom: 2px;
+        }}
+        .a-card .val {{
+            font-size: 18px;
+            font-weight: 600;
+            color: #0c2340;
+        }}
+        </style>
 
-    <h3>1. Project Definition & Assumptions</h3>
-    <p>This feasibility model evaluates a <span class="highlight">{units}-unit</span> residential
-    development in the New York City market. Key input definitions:</p>
-    <p>• <span class="highlight">Construction Cost per Unit</span>: ${construction_cost:,}
-    — <em>excludes land cost</em>, covering hard construction only. NYC/NJ rental construction
-    typically ranges from $400K to $1M+ per unit depending on building class.</p>
-    <p>• <span class="highlight">Land Cost</span>: ${land_cost:,} — calculated separately as it is
-    highly location-dependent.</p>
-    <p>• <span class="highlight">Soft Cost Rate</span>: {soft_cost_rate:.0%} of hard construction
-    cost — covers architectural, engineering, legal, permitting, and financing fees.</p>
-    <p>• <span class="highlight">Exit Cap Rate</span>: {cap_rate:.2%} — capitalization rate applied
-    to stabilized NOI to derive exit property value.</p>
+        <div class="analysis-section">
 
-    <h3>2. Income & Operating Expenses</h3>
-    <p>Assuming a monthly rent of <span class="highlight">${rent:,}</span> per unit and a vacancy
-    rate of {vacancy_rate:.2%}, the effective gross income is
-    <span class="highlight">${income.effective_gross_income:,.0f}</span>.</p>
-    <p>Operating expenses total <span class="highlight">${expenses.total_expenses:,.0f}</span>,
-    which include property taxes (1.2% of EGI), property insurance ($800/unit/year), maintenance
-    ($1,200/unit/year), utilities ($900/unit/year), and management fee (5% of EGI). Stabilized
-    <span class="highlight">NOI = ${noi:,.0f}</span>.</p>
-    <p class="note">Note: NOI is the numerator in cap-rate-based valuation and is, by convention,
-    unlevered — debt service (loan costs) is intentionally excluded.</p>
+        <h3>1. Project definition & assumptions</h3>
+        <div class="a-cards">
+            <div class="a-card"><div class="lbl">Units</div><div class="val">{units}</div></div>
+            <div class="a-card"><div class="lbl">Cost / unit</div><div class="val">${construction_cost:,}</div></div>
+            <div class="a-card"><div class="lbl">Land cost</div><div class="val">${land_cost:,}</div></div>
+            <div class="a-card"><div class="lbl">Soft cost rate</div><div class="val">{soft_cost_rate:.0%}</div></div>
+            <div class="a-card"><div class="lbl">Exit cap rate</div><div class="val">{cap_rate:.2%}</div></div>
+        </div>
+        <p>This feasibility model evaluates a <span class="highlight">{units}-unit</span> residential
+        development in the New York City market. Construction cost per unit (${construction_cost:,})
+        <em>excludes land cost</em>, covering hard construction only. NYC/NJ rental construction
+        typically ranges from $400K to $1M+ per unit depending on building class. Land cost
+        (${land_cost:,}) is calculated separately as it is highly location-dependent. Soft costs
+        ({soft_cost_rate:.0%} of hard cost) cover architectural, engineering, legal, permitting,
+        and financing fees.</p>
 
-    <h3>3. Valuation & Development Cost</h3>
-    <p>Applying the exit cap rate of {cap_rate:.2%} to stabilized NOI yields a projected property
-    value of <span class="highlight">${valuation.property_value:,.0f}</span>.</p>
-    <p>Total development cost breakdown:</p>
-    <p>• Land: ${land_cost:,.0f}<br>
-    • Hard construction: ${construction_cost * units:,.0f} ({units} units × ${construction_cost:,})<br>
-    • Soft costs: ${construction_cost * units * soft_cost_rate:,.0f} ({soft_cost_rate:.0%} of hard cost)<br>
-    • <span class="highlight">Total: ${development.total_cost:,.0f}</span></p>
-    <p>Implied <span class="highlight">gross developer profit = ${gross_profit:,.0f}</span>.</p>
+        <h3>2. Income & operating expenses</h3>
+        <div class="a-cards">
+            <div class="a-card"><div class="lbl">Monthly rent</div><div class="val">${rent:,}</div></div>
+            <div class="a-card"><div class="lbl">Vacancy rate</div><div class="val">{vacancy_rate:.2%}</div></div>
+            <div class="a-card"><div class="lbl">Effective gross income</div><div class="val">${income.effective_gross_income:,.0f}</div></div>
+            <div class="a-card"><div class="lbl">Total expenses</div><div class="val">${expenses.total_expenses:,.0f}</div></div>
+            <div class="a-card"><div class="lbl">Stabilized NOI</div><div class="val">${noi:,.0f}</div></div>
+        </div>
+        <p>Operating expenses include property taxes (1.2% of EGI), property insurance ($800/unit/year),
+        maintenance ($1,200/unit/year), utilities ($900/unit/year), and management fee (5% of EGI).</p>
+        <p class="note">NOI is the numerator in cap-rate-based valuation and is, by convention,
+        unlevered — debt service (loan costs) is intentionally excluded.</p>
 
-    <h3>4. Return Metrics</h3>
-    <p>Over a {construction_years}-year construction period, {lease_up_years}-year lease-up, and
-    {hold_years}-year hold period, the model yields:</p>
-    <p>• <span class="highlight">IRR: {investment['irr']:.2%}</span><br>
-    • <span class="highlight">Equity Multiple: {investment['equity_multiple']:.2f}x</span><br>
-    • <span class="highlight">NPV (at 8% discount rate): ${investment.get('npv', 0):,.0f}</span></p>
-    <p class="note">Note: Returns are reported on a Gross basis — transaction costs at exit (legal
-    fees, broker commissions, transfer taxes) are not deducted, as these vary widely by deal
-    complexity and are difficult to estimate at the modeling stage.</p>
+        <h3>3. Valuation & development cost</h3>
+        <div class="a-cards">
+            <div class="a-card"><div class="lbl">Property value</div><div class="val">${valuation.property_value:,.0f}</div></div>
+            <div class="a-card"><div class="lbl">Total dev cost</div><div class="val">${development.total_cost:,.0f}</div></div>
+            <div class="a-card"><div class="lbl">Gross profit</div><div class="val">${gross_profit:,.0f}</div></div>
+        </div>
+        <p>At an exit cap rate of {cap_rate:.2%}, stabilized NOI yields a property value of
+        ${valuation.property_value:,.0f}. Development cost comprises land (${land_cost:,.0f}),
+        hard construction (${construction_cost * units:,.0f}), and soft costs
+        (${construction_cost * units * soft_cost_rate:,.0f}).</p>
 
-    <h3>5. Market Context</h3>
-    <p>Current NYC market data:</p>
-    <p>• Vacancy Rate: {vacancy_rate:.2%}<br>
-    • Annual Rent Growth: {rent_growth:.2%}<br>
-    • Rental Inventory: {inventory:,} units<br>
-    • Discount Share: {discount_rate:.2%}</p>
-    <p>The composite market score of <span class="highlight">{market['market_score']:.2f}</span>
-    (out of 1.0) reflects <span class="highlight">{market_condition}</span> market conditions.</p>
+        <h3>4. Return metrics</h3>
+        <div class="a-cards">
+            <div class="a-card"><div class="lbl">IRR</div><div class="val">{investment['irr']:.2%}</div></div>
+            <div class="a-card"><div class="lbl">Equity multiple</div><div class="val">{investment['equity_multiple']:.2f}x</div></div>
+            <div class="a-card"><div class="lbl">NPV (8% disc.)</div><div class="val">${investment.get('npv', 0):,.0f}</div></div>
+        </div>
+        <p>Over a {construction_years}-year construction period, {lease_up_years}-year lease-up, and
+        {hold_years}-year hold period. Discount rate is 8.0%.</p>
+        <p class="note">Returns are reported on a Gross basis — transaction costs at exit (legal fees,
+        broker commissions, transfer taxes) are not deducted.</p>
 
-    <h3>6. Sensitivity</h3>
-    <p>IRR is highly sensitive to exit cap rate. A 25–50 basis point move in cap rate produces
-    meaningful changes in exit value and equity multiple. The Sensitivity tab shows IRR across a
-    ±100 bp cap rate range and ±10% rent range, capturing realistic market volatility.</p>
+        <h3>5. Market context</h3>
+        <div class="a-cards">
+            <div class="a-card"><div class="lbl">Vacancy rate</div><div class="val">{vacancy_rate:.2%}</div></div>
+            <div class="a-card"><div class="lbl">Rent growth</div><div class="val">{rent_growth:.2%}</div></div>
+            <div class="a-card"><div class="lbl">Rental inventory</div><div class="val">{inventory:,}</div></div>
+            <div class="a-card"><div class="lbl">Discount share</div><div class="val">{discount_rate:.2%}</div></div>
+            <div class="a-card"><div class="lbl">Market score</div><div class="val">{market['market_score']:.2f}</div></div>
+        </div>
+        <p>The composite market score of {market['market_score']:.2f} (out of 1.0) reflects
+        <span class="highlight">{market_condition}</span> market conditions.</p>
 
-    <h3>7. Investment Decision</h3>
-    <p>Based on the combined return profile and market score, the model recommends:
-    <span class="highlight">{decision['decision']}</span>.</p>
-    <p>Investors should closely monitor exit cap rate movement (the single largest driver of return),
-    construction cost inflation, and NYC regulatory changes — including rent stabilization policies —
-    which are not directly captured in this model.</p>
+        <h3>6. Sensitivity</h3>
+        <p>IRR is highly sensitive to exit cap rate. A 25-50 basis point move in cap rate produces
+        meaningful changes in exit value and equity multiple. The Sensitivity tab shows IRR across a
+        +/-100 bp cap rate range and +/-10% rent range, capturing realistic market volatility.</p>
 
-    </div>
-    """
+        <h3>7. Investment decision</h3>
+        <div class="a-cards">
+            <div class="a-card"><div class="lbl">Decision</div><div class="val">{decision['decision']}</div></div>
+            <div class="a-card"><div class="lbl">Market score</div><div class="val">{score_pct:.0f} / 100</div></div>
+        </div>
+        <p>Based on the combined return profile and market score, the model recommends
+        <span class="highlight">{decision['decision']}</span>. Investors should closely monitor exit
+        cap rate movement, construction cost inflation, and NYC regulatory changes including rent
+        stabilization policies.</p>
+
+        </div>
+        """
 
     st.markdown(analysis_html, unsafe_allow_html=True)
+
+    # Section 8: NJ substitution analysis (only in NYC vs NJ mode)
+    if analysis_mode == "NYC vs NJ" and nj_results:
+        nj_html = f"""
+            <div class="analysis-section">
+            <h3>8. NJ Substitution Analysis</h3>
+            <p>To assess cross-market risk, a hypothetical {units}-unit development in New Jersey is
+            modeled using the same project structure but NJ-specific market assumptions.</p>
+
+            <p><span class="highlight">NJ assumptions</span>: monthly rent ${nj_rent:,}, vacancy rate
+            {nj_vacancy_rate:.2%}, annual rent growth {nj_rent_growth:.2%}, construction cost
+            ${nj_construction_cost:,}/unit, land cost ${nj_land_cost:,}.</p>
+
+            <p>Under these assumptions, the NJ project yields an IRR of
+            <span class="highlight">{nj_results['irr']:.2%}</span> and an equity multiple of
+            <span class="highlight">{nj_results['em']:.2f}x</span>, compared to NYC's
+            {investment['irr']:.2%} IRR and {investment['equity_multiple']:.2f}x equity multiple.</p>
+
+            <p>The substitution pressure indicator is rated
+            <span class="highlight">{sub_pressure}</span>, based on three factors:</p>
+            <p>• <em>Price gap</em>: NYC rent (${rent:,}) is {rent / max(nj_rent, 1):.1f}x NJ rent (${nj_rent:,})<br>
+            • <em>Growth differential</em>: NJ rent growth ({nj_rent_growth:.2%}) vs NYC ({rent_growth:.2%})<br>
+            • <em>Vacancy differential</em>: NJ vacancy ({nj_vacancy_rate:.2%}) vs NYC ({vacancy_rate:.2%})</p>
+
+            <p class="note">Note: This comparison uses user-provided NJ assumptions rather than
+            automated market data. NJ figures should reference Zillow ZORI or equivalent sources for
+            consistency with NYC StreetEasy data. The substitution pressure indicator is qualitative
+            and does not numerically adjust NYC return metrics.</p>
+            </div>
+            """
+        st.markdown(nj_html, unsafe_allow_html=True)
