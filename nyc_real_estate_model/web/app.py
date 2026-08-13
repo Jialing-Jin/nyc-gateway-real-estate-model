@@ -355,10 +355,9 @@ with st.spinner("Loading market data…"):
 # ── Run models ────────────────────────────────────────────────────────────────
 timeline_model = DevelopmentTimeline()
 # build_timeline needs integer years; round lease_up_years (e.g. 1.5) up to nearest int
-import math
 timeline = timeline_model.build_timeline(
     int(construction_years),
-    int(math.ceil(lease_up_years)),
+    lease_up_years,
     int(hold_years)
 )
 
